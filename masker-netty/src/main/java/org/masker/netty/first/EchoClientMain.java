@@ -1,5 +1,6 @@
 package org.masker.netty.first;
 
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -7,7 +8,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import lombok.extern.slf4j.Slf4j;
+import org.masker.netty.first.handler.EchoClientHandler;
 import org.masker.netty.first.handler.EchoServerHandler;
 
 import java.net.InetSocketAddress;
@@ -17,49 +20,48 @@ import java.net.InetSocketAddress;
  * @since：2021/12/16 14:04
  */
 @Slf4j
-public class EchoServerMain {
+public class EchoClientMain {
 
     private final int port;
 
-    public EchoServerMain(int port){
+    public EchoClientMain(int port){
         this.port = port;
     }
 
     public static void main(String[] args) throws Exception {
-        new EchoServerMain(8089).start();
+        new EchoClientMain(8089).start();
     }
 
 
     public void start() throws Exception {
-        log.info("EchoServerMain start ......");
-        final EchoServerHandler serverHandler = new EchoServerHandler();
+        log.info("EchoClientMain start ......");
         // 创建 EventLoopGroup
         EventLoopGroup group = new NioEventLoopGroup();
         try {
             // 创建 ServerBootstrap
-            ServerBootstrap bootstrap = new ServerBootstrap();
+            Bootstrap bootstrap = new Bootstrap();
             bootstrap.group(group)
-                    //指定使用的传输channel 为 NioServerSocketChannel
-                    .channel(NioServerSocketChannel.class)
+                    //
+                    .channel(NioSocketChannel.class)
                     // 使用指定的端口设置套接字地址
-                    .localAddress(new InetSocketAddress(port))
+                    .remoteAddress(new InetSocketAddress("127.0.0.1",port))
                     // 添加一个EchoServerHandler 到一个子 channel的 channelPipLine
-                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                    .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             // EchoServerHandler 被标注为 @Sharable 所以我们可以总是使用同样的实例 ？？
-                            socketChannel.pipeline().addLast(serverHandler);
+                            socketChannel.pipeline().addLast( new EchoClientHandler());
                         }
                     });
-            log.info("EchoServerMain 异步地绑定服务器 调用sync()方法阻塞等待直到绑定完成");
-            // 异步地绑定服务器 调用sync()方法阻塞等待直到绑定完成
-            ChannelFuture channelFuture = bootstrap.bind().sync();
-            log.info("EchoServerMain 获取Channel的 CloseFuture 并且阻塞当前线程直到它完成");
+            // 连接到远程节点 阻塞等待直到连接完成
+            log.info("EchoClientMain 连接到远程节点 阻塞等待直到连接完成");
+            ChannelFuture channelFuture = bootstrap.connect().sync();
+
             // 获取Channel的 CloseFuture 并且阻塞当前线程直到它完成
+            log.info("EchoClientMain 连接到远程节点 阻塞等待直到连接完成");
             channelFuture.channel().closeFuture().sync();
         }finally {
             // 关闭 EventLoopGroup 释放所有资源
-            log.info("EchoServerMain 关闭 EventLoopGroup 释放所有资源");
             group.shutdownGracefully().sync();
         }
     }
